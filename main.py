@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-import numpy
+import numpy as np
 from numpy import random
 import scipy
 import matplotlib
@@ -23,21 +23,21 @@ def load_MNIST_dataset():
         mnist_data = mnist.MNIST(mnist_data_directory, return_type="numpy", gz=True)
         Xs_tr, Lbls_tr = mnist_data.load_training();
         Xs_tr = Xs_tr.transpose() / 255.0
-        Ys_tr = numpy.zeros((10, 60000))
+        Ys_tr = np.zeros((10, 60000))
         for i in range(60000):
             Ys_tr[Lbls_tr[i], i] = 1.0  # one-hot encode each label
         # shuffle the training data
-        numpy.random.seed(8675309)
-        perm = numpy.random.permutation(60000)
-        Xs_tr = numpy.ascontiguousarray(Xs_tr[:,perm])
-        Ys_tr = numpy.ascontiguousarray(Ys_tr[:,perm])
+        np.random.seed(8675309)
+        perm = np.random.permutation(60000)
+        Xs_tr = np.ascontiguousarray(Xs_tr[:,perm])
+        Ys_tr = np.ascontiguousarray(Ys_tr[:,perm])
         Xs_te, Lbls_te = mnist_data.load_testing();
         Xs_te = Xs_te.transpose() / 255.0
-        Ys_te = numpy.zeros((10, 10000))
+        Ys_te = np.zeros((10, 10000))
         for i in range(10000):
             Ys_te[Lbls_te[i], i] = 1.0  # one-hot encode each label
-        Xs_te = numpy.ascontiguousarray(Xs_te)
-        Ys_te = numpy.ascontiguousarray(Ys_te)
+        Xs_te = np.ascontiguousarray(Xs_te)
+        Ys_te = np.ascontiguousarray(Ys_te)
         dataset = (Xs_tr, Ys_tr, Xs_te, Ys_te)
         pickle.dump(dataset, open(PICKLE_FILE, 'wb'))
     return dataset
@@ -54,6 +54,10 @@ def load_MNIST_dataset():
 # returns   the average gradient of the regularized loss of the examples in vector ii with respect to the model parameters
 def multinomial_logreg_grad_i(Xs, Ys, ii, gamma, W):
     # TODO students should use their implementation from programming assignment 2
+    Xs, Ys = Xs[:,ii], Ys[:,ii]
+    ewx = np.exp(np.matmul(W,Xs))
+    p = np.sum(ewx, axis=0)
+    return 1 / Xs.shape[1] * np.matmul(-Ys+ 1/p * ewx, Xs.T) + gamma * W
 
 
 # compute the error of the classifier (SAME AS PROGRAMMING ASSIGNMENT 1)
@@ -65,6 +69,7 @@ def multinomial_logreg_grad_i(Xs, Ys, ii, gamma, W):
 # returns   the model error as a percentage of incorrect labels
 def multinomial_logreg_error(Xs, Ys, W):
     # TODO students should use their implementation from programming assignment 1
+    return np.mean(np.argmax(np.matmul(W, Xs), axis=0) != np.argmax(Ys, axis=0))
 
 
 # compute the cross-entropy loss of the classifier
@@ -77,6 +82,9 @@ def multinomial_logreg_error(Xs, Ys, W):
 # returns   the model cross-entropy loss
 def multinomial_logreg_loss(Xs, Ys, gamma, W):
     # TODO students should implement this
+    ewx = np.exp(np.matmul(W, Xs))
+    logSoft = np.log( np.sum(ewx, axis=0) * ewx)
+    return np.sum( Ys * logSoft, axis=0) + gamma / 2 * np.sum(W**2)
 
 
 # gradient descent (SAME AS PROGRAMMING ASSIGNMENT 1)
@@ -92,6 +100,12 @@ def multinomial_logreg_loss(Xs, Ys, gamma, W):
 # returns         a list of model parameters, one every "monitor_period" epochs
 def gradient_descent(Xs, Ys, gamma, W0, alpha, num_epochs, monitor_period):
     # TODO students should use their implementation from programming assignment 1
+    models = []
+    for i in range(1,num_epochs+1):
+        W0 = W0 - alpha * multinomial_logreg_grad_i(Xs, Ys, np.arange(Xs.shape[1]), gamma, W0)
+        if i % monitor_period == 0:
+            models.append(W0)
+    return models
 
 
 # gradient descent with nesterov momentum
