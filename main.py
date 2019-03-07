@@ -84,7 +84,7 @@ def multinomial_logreg_loss(Xs, Ys, gamma, W):
     # TODO students should implement this
     ewx = np.exp(np.matmul(W, Xs))
     logSoft = np.log( np.sum(ewx, axis=0) * ewx)
-    return np.sum( Ys * logSoft, axis=0) + gamma / 2 * np.sum(W**2)
+    return - np.sum( Ys * logSoft) / Xs.shape[1] + gamma / 2 * np.sum(W**2)
 
 
 # gradient descent (SAME AS PROGRAMMING ASSIGNMENT 1)
@@ -105,6 +105,7 @@ def gradient_descent(Xs, Ys, gamma, W0, alpha, num_epochs, monitor_period):
         W0 = W0 - alpha * multinomial_logreg_grad_i(Xs, Ys, np.arange(Xs.shape[1]), gamma, W0)
         if i % monitor_period == 0:
             models.append(W0)
+            print("epoch", i)
     return models
 
 
@@ -156,7 +157,7 @@ def sgd_minibatch_sequential_scan(Xs, Ys, gamma, W0, alpha, B, num_epochs, monit
             W0 = W0 - alpha * multinomial_logreg_grad_i(Xs, Ys, ii, gamma, W0) - alpha * gamma * W0
             if (j+cur+1) % monitor_period == 0:
                 models.append(W0)
-                print("epoch", i)
+        print("epoch", i)
     return models
 
 
@@ -186,7 +187,7 @@ def sgd_mss_with_momentum(Xs, Ys, gamma, W0, alpha, beta, B, num_epochs, monitor
             W0 = W0 + V0
             if (j+cur+1) % monitor_period == 0:
                 models.append(W0)
-                print("epoch", i)
+        print("epoch", i)
     return models
 
 
@@ -278,6 +279,18 @@ if __name__ == "__main__":
         pyplot.gca().legend()
         pyplot.savefig(title + measure + '.png', bbox_inches='tight')
 
+    def plot_runtimes(x_positions, times, names, filename='train_time.png'):
+        # plot runtime for training as a bar graph
+        pyplot.figure(3)
+        pyplot.bar(x_positions, times, align='center', alpha=0.5)
+        pyplot.xticks(x_positions, names)
+        pyplot.ylabel('Average Runtime per Model (seconds)')
+        pyplot.xlabel('Models')
+        pyplot.title('Runtime of Model Training ')
+        for i, v in enumerate(times):
+            pyplot.text(i-.25, v * (1.015), " " + str(round(v,2)) +' s', color='black', va='center', fontweight='bold')
+        pyplot.savefig(filename, bbox_inches='tight')
+
     ''' Time the algorightms in [algos], whose respective names are given by [names],
         by averaging the runtime of the algorithm over 5 runs.
         PreC :The algorithms must be lambdas that take no inputs '''
@@ -340,15 +353,7 @@ if args.part1:
         x_positions = np.arange(len(names))
 
         # plot runtime for training as a bar graph
-        pyplot.figure(3)
-        pyplot.bar(x_positions, times, align='center', alpha=0.5)
-        pyplot.xticks(x_positions, names)
-        pyplot.ylabel('Average runtime (per model)')
-        pyplot.xlabel('Models')
-        pyplot.title('Runtime of Model Training ')
-        for i, v in enumerate(times):
-            pyplot.text(i-.25, v * (1.015), " " + str(round(v,2)), color='black', va='center', fontweight='bold')
-        pyplot.savefig('train_time_part1.png', bbox_inches='tight')
+        plot_runtimes(x_positions, times, names, filename='train_time_part1.png')
 
 
 
@@ -384,14 +389,14 @@ if args.part2:
         # Get the range of times
         t = np.arange(1, num_epochs + 1, .1)
         # plot training error as a function of epochs
-        plot_error(t, model_error_tr, names, "Gradient Descent and Nesterov's Momentum Training")
+        plot_error(t, model_error_tr, names, "SGD and Momentum Training")
         # plot test error as a function of epochs
-        plot_error(t, model_error_te, names, "Gradient Descent and Nesterov's Momentum Test")
+        plot_error(t, model_error_te, names, "SGD and Momentum Test")
         # plot training loss as a function of epochs
-        plot_error(t, model_training_loss, names, "Gradient Descent and Nesterov's Momentum Training", measure='Loss')
+        plot_error(t, model_training_loss, names, "SGD and Momentum Training", measure='Loss')
 
     if args.time:
-        algos = [sgd_mini, lambda : sgd_momentum(beta1)]
+        algos = [lambda : sgd_mini(0), lambda : sgd_momentum(beta1)]
         names = ["Minibatch SGD", "Minibatch SGD + Momentum"]
 
         # Make plots for the average runtimes
@@ -399,17 +404,12 @@ if args.part2:
         x_positions = np.arange(len(names))
 
         # plot runtime for training as a bar graph
-        pyplot.figure(3)
-        pyplot.bar(x_positions, times, align='center', alpha=0.5)
-        pyplot.xticks(x_positions, names)
-        pyplot.ylabel('Average runtime (per model)')
-        pyplot.xlabel('Models')
-        pyplot.title('Runtime of Model Training ')
-        for i, v in enumerate(times):
-            pyplot.text(i - .25, v * (1.015), " " + str(round(v, 2)), color='black', va='center', fontweight='bold')
-        pyplot.savefig('train_time_part1.png', bbox_inches='tight')
+        plot_runtimes(x_positions, times, names, filename='train_time_part2.png')
 
 
 
 if args.part3:
     print("Part 3")
+    alpha1, alpha2 = 0.2, 0.01
+    B, monitor_period = 600, 10
+    rho1, rho2 = 0.9, 0.999
