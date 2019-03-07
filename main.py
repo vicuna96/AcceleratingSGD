@@ -231,6 +231,7 @@ if __name__ == "__main__":
     (Xs_tr, Ys_tr, Xs_te, Ys_te) = load_MNIST_dataset()
     # TODO add code to produce figures
     from argparse import ArgumentParser
+    import timeit
 
     # Define the parser to run script on cmd
     parser = ArgumentParser(add_help=True)
@@ -240,6 +241,10 @@ if __name__ == "__main__":
                         help="To run part 2 of the assignment")
     parser.add_argument("--part3", action='store_true',
                         help="To run part 3 of the assignment")
+    parser.add_argument("--accu", action='store_true',
+                        help="To run accuracy section of the corresponding part of the assignment")
+    parser.add_argument("--time", action='store_true',
+                        help="To time corresponding part of the assignment")
 
     args = parser.parse_args()
 
@@ -248,6 +253,7 @@ if __name__ == "__main__":
     c,_ = Ys_tr.shape
     d,_ = Xs_tr.shape
     W0 = np.zeros((c,d))
+    beta1, beta2 = 0.9, 0.99
     gamma = 0.0001
 
     def get_error(Xs, Ys, models):
@@ -272,48 +278,137 @@ if __name__ == "__main__":
         pyplot.gca().legend()
         pyplot.savefig(title + measure + '.png', bbox_inches='tight')
 
+    ''' Time the algorightms in [algos], whose respective names are given by [names],
+        by averaging the runtime of the algorithm over 5 runs.
+        PreC :The algorithms must be lambdas that take no inputs '''
+    def time_algos(names, algos):
+        times = []
+        for name, algo in zip(names,algos):
+            time = 0
+            for _ in range(5):
+                time -= timeit.default_timer()
+                _ = algo()
+                time += timeit.default_timer()
+            times.append(time/5)
+            print(name,time/5,"seconds")
+        return times
 
 if args.part1:
     print("Part 1")
     alpha, num_epochs = 1.0, 100
-    beta1, beta2 = 0.9, 0.99
     monitor_period = 1
 
     gd = lambda _ : gradient_descent(Xs_tr, Ys_tr, gamma, W0, alpha, num_epochs, monitor_period)
 
     momentum = lambda beta : gd_nesterov(Xs_tr, Ys_tr, gamma, W0, alpha, beta, num_epochs, monitor_period)
 
-    algos = [gd, momentum, momentum]
-    params = [0, beta1, beta2]
-    names = ["Gradient Descent",
-             "Nesterov's Momentum beta="+str(round(beta1,3)),
-             "Nesterov's Momentum beta="+str(round(beta2,3))
-             ]
-    models = []
+    if args.accu:
+        algos = [gd, momentum, momentum]
+        params = [0, beta1, beta2]
+        names = ["Gradient Descent",
+                 "Nesterov's Momentum beta="+str(round(beta1,3)),
+                 "Nesterov's Momentum beta="+str(round(beta2,3))
+                 ]
+        models = []
 
-    for algo, param, name in zip(algos, params, names):
-        models.append(algo(param))
-        print(name, "done")
+        for algo, param, name in zip(algos, params, names):
+            models.append(algo(param))
+            print(name, "done")
 
-    # Get model errors
-    model_error_tr = [get_error(Xs_tr, Ys_tr, model) for model in models]
-    print("Errors for training set done")
-    model_error_te = [get_error(Xs_te, Ys_te, model) for model in models]
-    print("Errors for test set done")
-    model_error_loss = [get_loss(Xs_te, Ys_te, model) for model in models]
-    print("Loss for training set done")
-    # Get the range of times
-    t = np.arange(1, num_epochs + 1)
-    # plot training error as a function of epochs
-    plot_error(t, model_error_tr, names, "Gradient Descent and Nesterov's Momentum Training")
-    # plot test error as a function of epochs
-    plot_error(t, model_error_te, names, "Gradient Descent and Nesterov's Momentum Test")
-    # plot training loss as a function of epochs
-    plot_error(t, model_error_tr, names, "Gradient Descent and Nesterov's Momentum Training", measure='Loss')
+        # Get model errors
+        model_error_tr = [get_error(Xs_tr, Ys_tr, model) for model in models]
+        print("Errors for training set done")
+        model_error_te = [get_error(Xs_te, Ys_te, model) for model in models]
+        print("Errors for test set done")
+        model_training_loss = [get_loss(Xs_te, Ys_te, model) for model in models]
+        print("Loss for training set done")
+        # Get the range of times
+        t = np.arange(1, num_epochs + 1)
+        # plot training error as a function of epochs
+        plot_error(t, model_error_tr, names, "Gradient Descent and Nesterov's Momentum Training")
+        # plot test error as a function of epochs
+        plot_error(t, model_error_te, names, "Gradient Descent and Nesterov's Momentum Test")
+        # plot training loss as a function of epochs
+        plot_error(t, model_training_loss, names, "Gradient Descent and Nesterov's Momentum Training", measure='Loss')
+
+    if args.time:
+        algos = [gd, lambda : momentum(beta1)]
+        names = ["Gradient Descent", "Nesterov's Momentum"]
+
+        # Make plots for the average runtimes
+        times = time_algos(names, algos)
+        x_positions = np.arange(len(names))
+
+        # plot runtime for training as a bar graph
+        pyplot.figure(3)
+        pyplot.bar(x_positions, times, align='center', alpha=0.5)
+        pyplot.xticks(x_positions, names)
+        pyplot.ylabel('Average runtime (per model)')
+        pyplot.xlabel('Models')
+        pyplot.title('Runtime of Model Training ')
+        for i, v in enumerate(times):
+            pyplot.text(i-.25, v * (1.015), " " + str(round(v,2)), color='black', va='center', fontweight='bold')
+        pyplot.savefig('train_time_part1.png', bbox_inches='tight')
+
 
 
 if args.part2:
     print("Part 2")
+    alpha, B = 0.2, 600
+    num_epochs, monitor_period = 10, 10
+
+    sgd_mini = lambda _ : sgd_minibatch_sequential_scan(Xs_tr, Ys_tr, gamma, W0, alpha, B, num_epochs, monitor_period)
+    sgd_momentum = lambda beta : sgd_mss_with_momentum(Xs_tr, Ys_tr, gamma, W0, alpha, beta, B, num_epochs, monitor_period)
+
+    if args.accu:
+        algos = [sgd_mini, sgd_momentum, sgd_momentum]
+        params = [0, beta1, beta2]
+        names = ["Sequential Minibatch SGD",
+                 "Minibatch SGD + Momentum beta=" + str(round(beta1, 3)),
+                 "Minibatch SGD + Momentum beta=" + str(round(beta2, 3))
+                 ]
+        models = []
+
+        for algo, param, name in zip(algos, params, names):
+            models.append(algo(param))
+            print(name, "done")
+
+        # Get model errors
+        model_error_tr = [get_error(Xs_tr, Ys_tr, model) for model in models]
+        print("Errors for training set done")
+        model_error_te = [get_error(Xs_te, Ys_te, model) for model in models]
+        print("Errors for test set done")
+        model_training_loss = [get_loss(Xs_te, Ys_te, model) for model in models]
+        print("Loss for training set done")
+
+        # Get the range of times
+        t = np.arange(1, num_epochs + 1, .1)
+        # plot training error as a function of epochs
+        plot_error(t, model_error_tr, names, "Gradient Descent and Nesterov's Momentum Training")
+        # plot test error as a function of epochs
+        plot_error(t, model_error_te, names, "Gradient Descent and Nesterov's Momentum Test")
+        # plot training loss as a function of epochs
+        plot_error(t, model_training_loss, names, "Gradient Descent and Nesterov's Momentum Training", measure='Loss')
+
+    if args.time:
+        algos = [sgd_mini, lambda : sgd_momentum(beta1)]
+        names = ["Minibatch SGD", "Minibatch SGD + Momentum"]
+
+        # Make plots for the average runtimes
+        times = time_algos(names, algos)
+        x_positions = np.arange(len(names))
+
+        # plot runtime for training as a bar graph
+        pyplot.figure(3)
+        pyplot.bar(x_positions, times, align='center', alpha=0.5)
+        pyplot.xticks(x_positions, names)
+        pyplot.ylabel('Average runtime (per model)')
+        pyplot.xlabel('Models')
+        pyplot.title('Runtime of Model Training ')
+        for i, v in enumerate(times):
+            pyplot.text(i - .25, v * (1.015), " " + str(round(v, 2)), color='black', va='center', fontweight='bold')
+        pyplot.savefig('train_time_part1.png', bbox_inches='tight')
+
 
 
 if args.part3:
