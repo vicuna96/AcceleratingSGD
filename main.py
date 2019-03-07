@@ -122,6 +122,15 @@ def gradient_descent(Xs, Ys, gamma, W0, alpha, num_epochs, monitor_period):
 # returns         a list of model parameters, one every "monitor_period" epochs
 def gd_nesterov(Xs, Ys, gamma, W0, alpha, beta, num_epochs, monitor_period):
     # TODO students should implement this
+    V0, models = W0, []
+    for i in range(1, num_epochs+1):
+        tmp = V0
+        V0 = W0 - alpha * multinomial_logreg_grad_i(Xs, Ys, np.arange(Xs.shape[1]), gamma, W0)
+        W0 = V0 + beta * (V0 - tmp)
+        if i % monitor_period == 0:
+            models.append(W0)
+            print("epoch", i)
+    return models
 
 
 # SGD: run stochastic gradient descent with minibatching and sequential sampling order (SAME AS PROGRAMMING ASSIGNMENT 2)
@@ -138,6 +147,17 @@ def gd_nesterov(Xs, Ys, gamma, W0, alpha, beta, num_epochs, monitor_period):
 # returns         a list of model parameters, one every "monitor_period" batches
 def sgd_minibatch_sequential_scan(Xs, Ys, gamma, W0, alpha, B, num_epochs, monitor_period):
     # TODO students should use their implementation from programming assignment 2
+    n = Xs.shape[1]
+    models = []
+    for i in range(num_epochs):
+        cur = i*(n//B)
+        for j in range(n // B):
+            ii = np.arange(j*B,(j+1)*B)
+            W0 = W0 - alpha * multinomial_logreg_grad_i(Xs, Ys, ii, gamma, W0) - alpha * gamma * W0
+            if (j+cur+1) % monitor_period == 0:
+                models.append(W0)
+                print("epoch", i)
+    return models
 
 
 # SGD + Momentum: add momentum to the previous algorithm
@@ -155,6 +175,19 @@ def sgd_minibatch_sequential_scan(Xs, Ys, gamma, W0, alpha, B, num_epochs, monit
 # returns         a list of model parameters, one every "monitor_period" batches
 def sgd_mss_with_momentum(Xs, Ys, gamma, W0, alpha, beta, B, num_epochs, monitor_period):
     # TODO students should implement this
+    n = Xs.shape[1]
+    models = []
+    V0 = 0 * np.zeros(W0.shape)
+    for i in range(num_epochs):
+        cur = i*(n//B)
+        for j in range(n // B):
+            ii = np.arange(j*B,(j+1)*B)
+            V0 = beta * V0 - alpha * multinomial_logreg_grad_i(Xs, Ys, ii, gamma, W0)
+            W0 = W0 + V0
+            if (j+cur+1) % monitor_period == 0:
+                models.append(W0)
+                print("epoch", i)
+    return models
 
 
 # Adam Optimizer
@@ -174,8 +207,114 @@ def sgd_mss_with_momentum(Xs, Ys, gamma, W0, alpha, beta, B, num_epochs, monitor
 # returns         a list of model parameters, one every "monitor_period" batches
 def adam(Xs, Ys, gamma, W0, alpha, rho1, rho2, B, eps, num_epochs, monitor_period):
     # TODO students should implement this
+    n = Xs.shape[1]
+    r, s = np.zeros(W0.shape), np.zeros(W0.shape)
+    t = 0
+    models = []
+    for i in range(1,num_epochs+1):
+        t += 1
+        cur = i * (n // B)
+        for j in range(n//B):
+            ii = np.arange(j * B, (j + 1) * B)
+            g = multinomial_logreg_grad_i(Xs, Ys, ii, gamma, W0)
+            s = (rho1 * s + (1-rho1) * g) / (1-rho1)
+            r = (rho2 * r + (1-rho2) * g**2) / (1-rho2)
+            W0 -= alpha * s / np.sqrt(r + eps)
+            if (j+cur+1) % monitor_period == 0:
+                models.append(W0)
+                print("epoch", i)
+
+
 
 
 if __name__ == "__main__":
     (Xs_tr, Ys_tr, Xs_te, Ys_te) = load_MNIST_dataset()
     # TODO add code to produce figures
+    from argparse import ArgumentParser
+
+    # Define the parser to run script on cmd
+    parser = ArgumentParser(add_help=True)
+    parser.add_argument("--part1", action='store_true',
+                        help="To run part 1 of the assignment")
+    parser.add_argument("--part2", action='store_true',
+                        help="To run part 2 of the assignment")
+    parser.add_argument("--part3", action='store_true',
+                        help="To run part 3 of the assignment")
+
+    args = parser.parse_args()
+
+    # Global constants
+
+    c,_ = Ys_tr.shape
+    d,_ = Xs_tr.shape
+    W0 = np.zeros((c,d))
+    gamma = 0.0001
+
+    def get_error(Xs, Ys, models):
+        return [multinomial_logreg_error(Xs, Ys, W) for W in models]
+
+    def get_loss(Xs, Ys, models):
+        return [multinomial_logreg_loss(Xs, Ys, gamma, W) for W in models]
+
+
+    # Other functions
+
+    ''' Plot the model error for the models, whose respective names are given by [names].
+            Save the image by the name [title].png and indlude [title] in the figure title '''
+    def plot_error(t, model_error, names, title, measure='Error'):
+        pyplot.figure(np.random.randint(1000))
+        pyplot.xlabel('Epochs')
+        pyplot.ylabel(measure)
+        pyplot.title('MNIST ' + title + ' ' + measure)
+        pyplot.grid(True)
+        for name, error in zip(names, model_error):
+            pyplot.plot(t, error, label=name)
+        pyplot.gca().legend()
+        pyplot.savefig(title + measure + '.png', bbox_inches='tight')
+
+
+if args.part1:
+    print("Part 1")
+    alpha, num_epochs = 1.0, 100
+    beta1, beta2 = 0.9, 0.99
+    monitor_period = 1
+
+    gd = lambda _ : gradient_descent(Xs_tr, Ys_tr, gamma, W0, alpha, num_epochs, monitor_period)
+
+    momentum = lambda beta : gd_nesterov(Xs_tr, Ys_tr, gamma, W0, alpha, beta, num_epochs, monitor_period)
+
+    algos = [gd, momentum, momentum]
+    params = [0, beta1, beta2]
+    names = ["Gradient Descent",
+             "Nesterov's Momentum beta="+str(round(beta1,3)),
+             "Nesterov's Momentum beta="+str(round(beta2,3))
+             ]
+    models = []
+
+    for algo, param, name in zip(algos, params, names):
+        models.append(algo(param))
+        print(name, "done")
+
+    # Get model errors
+    model_error_tr = [get_error(Xs_tr, Ys_tr, model) for model in models]
+    print("Errors for training set done")
+    model_error_te = [get_error(Xs_te, Ys_te, model) for model in models]
+    print("Errors for test set done")
+    model_error_loss = [get_loss(Xs_te, Ys_te, model) for model in models]
+    print("Loss for training set done")
+    # Get the range of times
+    t = np.arange(1, num_epochs + 1)
+    # plot training error as a function of epochs
+    plot_error(t, model_error_tr, names, "Gradient Descent and Nesterov's Momentum Training")
+    # plot test error as a function of epochs
+    plot_error(t, model_error_te, names, "Gradient Descent and Nesterov's Momentum Test")
+    # plot training loss as a function of epochs
+    plot_error(t, model_error_tr, names, "Gradient Descent and Nesterov's Momentum Training", measure='Loss')
+
+
+if args.part2:
+    print("Part 2")
+
+
+if args.part3:
+    print("Part 3")
