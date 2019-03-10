@@ -83,7 +83,7 @@ def multinomial_logreg_error(Xs, Ys, W):
 def multinomial_logreg_loss(Xs, Ys, gamma, W):
     # TODO students should implement this
     ewx = np.exp(np.matmul(W, Xs))
-    logSoft = np.log( np.sum(ewx, axis=0) * ewx)
+    logSoft = np.log( ewx / np.sum(ewx, axis=0) )
     return - np.sum( Ys * logSoft) / Xs.shape[1] + gamma / 2 * np.sum(W**2)
 
 
@@ -233,8 +233,8 @@ def adam(Xs, Ys, gamma, W0, alpha, rho1, rho2, B, eps, num_epochs, monitor_perio
 if __name__ == "__main__":
     (Xs_tr, Ys_tr, Xs_te, Ys_te) = load_MNIST_dataset()
     # TODO add code to produce figures
-    from argparse import ArgumentParser
     import timeit
+    from argparse import ArgumentParser
 
     # Define the parser to run script on cmd
     parser = ArgumentParser(add_help=True)
@@ -254,7 +254,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Global constants
-
     c,_ = Ys_tr.shape
     d,_ = Xs_tr.shape
     W0 = np.zeros((c,d))
