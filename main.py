@@ -404,19 +404,22 @@ if args.part1:
             models.append(algo())
             print(name, "done")
 
-        # Get model errors
-        metrics = get_model_errors(models, loss=True)
-        measures = ["Error", "Error", "Loss"]
-        titles = [
-            "GD and Nesterov's Momentum Training Exploration",
-            "GD and Nesterov's Momentum Test Exploration ",
-            "GD and Nesterov's Momentum Training Exploration"
-        ]
 
+        # Get model errors
+        model_error_tr = [get_error(Xs_tr, Ys_tr, model) for model in models]
+        print("Errors for training set done")
+        model_error_te = [get_error(Xs_te, Ys_te, model) for model in models]
+        print("Errors for test set done")
+        model_training_loss = [get_loss(Xs_te, Ys_te, model) for model in models]
+        print("Loss for training set done")
         # Get the range of times
         t = np.arange(1, num_epochs + 1)
-        # Plot metrics
-        plot_metrics(t, metrics, names, titles, measures)
+        # plot training error as a function of epochs
+        plot_error(t, model_error_tr, names, "GD and Nesterov's Momentum Training Exploration")
+        # plot test error as a function of epochs
+        plot_error(t, model_error_te, names, "GD and Nesterov's Momentum Test Exploration")
+        # plot training loss as a function of epochs
+        plot_error(t, model_training_loss, names, "GD and Nesterov's Momentum Training Exploration", measure='Loss')
 
 
 
@@ -557,7 +560,7 @@ if args.part3:
         names = ["Minibatch SGD", "ADAM"]
 
         # Make plots for the average runtimes
-        times = time_algos(names, algos)
+        times = time_algos(names, algos, runs=10)
         x_positions = np.arange(len(names))
 
         # plot runtime for training as a bar graph
