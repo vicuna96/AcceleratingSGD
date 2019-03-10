@@ -221,7 +221,7 @@ def adam(Xs, Ys, gamma, W0, alpha, rho1, rho2, B, eps, num_epochs, monitor_perio
             s = rho1 * s + (1-rho1) * g
             r = rho2 * r + (1-rho2) * g**2
             sprime, rprime = s / (1-rho1**t), r / (1-rho2**t)
-            W0 -= alpha * sprime / np.sqrt(rprime + eps)
+            W0 = W0 - alpha * sprime / np.sqrt(rprime + eps)
             if (j+cur+1) % monitor_period == 0:
                 models.append(W0)
         print("epoch", i)
@@ -248,7 +248,7 @@ if __name__ == "__main__":
                         help="To run accuracy section of the corresponding part of the assignment")
     parser.add_argument("--time", action='store_true',
                         help="To time corresponding part of the assignment")
-    parser.add_argument("--expl", action='store_true',
+    parser.add_argument("--explore", action='store_true',
                         help="To run the exploration part of the assignment")
 
     args = parser.parse_args()
@@ -267,6 +267,17 @@ if __name__ == "__main__":
     def get_loss(Xs, Ys, models):
         return [multinomial_logreg_loss(Xs, Ys, gamma, W) for W in models]
 
+    def get_model_errors(models, loss=False):
+        model_error_tr = [get_error(Xs_tr, Ys_tr, model) for model in models]
+        print("Errors for training set done")
+        model_error_te = [get_error(Xs_te, Ys_te, model) for model in models]
+        print("Errors for test set done")
+        if loss:
+            model_training_loss = [get_loss(Xs_te, Ys_te, model) for model in models]
+            print("Loss for training set done")
+            return [model_error_tr, model_error_te, model_training_loss]
+        return [model_error_tr, model_error_te]
+
 
     # Other functions
 
@@ -281,7 +292,7 @@ if __name__ == "__main__":
         for name, error in zip(names, model_error):
             pyplot.plot(t, error, label=name)
         pyplot.gca().legend()
-        pyplot.savefig(title + measure + '.png', bbox_inches='tight')
+        pyplot.savefig((title + measure + '.png').replace(" ",""), bbox_inches='tight')
 
 
     ''' Plot the model runtimes [times] of the models whose respective names are given by [names].
@@ -298,6 +309,10 @@ if __name__ == "__main__":
             pyplot.text(i-.25, v * (1.015), " " + str(round(v,2)) +' s', color='black', va='center', fontweight='bold')
         pyplot.savefig(filename, bbox_inches='tight')
 
+    def plot_metrics(t, metrics, names, titles, measures):
+        for metric, name, title, measure in zip(metrics, names, titles, measures):
+            plot_error(t, metric, name, title, measure=measure)
+
     ''' Time the algorightms in [algos], whose respective names are given by [names],
         by averaging the runtime of the algorithm over 5 runs.
         PreC :The algorithms must be lambdas that take no inputs '''
@@ -313,6 +328,7 @@ if __name__ == "__main__":
             print(name,time/5,"seconds")
         return times
 
+
 if args.part1:
     print("Part 1")
     alpha, num_epochs = 1.0, 100
@@ -321,6 +337,10 @@ if args.part1:
     gd = lambda _ : gradient_descent(Xs_tr, Ys_tr, gamma, W0, alpha, num_epochs, monitor_period)
 
     momentum = lambda beta : gd_nesterov(Xs_tr, Ys_tr, gamma, W0, alpha, beta, num_epochs, monitor_period)
+
+    gd_alpha = lambda alpha : gradient_descent(Xs_tr, Ys_tr, gamma, W0, alpha, num_epochs, monitor_period)
+
+    momentum_alpha = lambda alpha, beta: gd_nesterov(Xs_tr, Ys_tr, gamma, W0, alpha, beta, num_epochs, monitor_period)
 
     if args.accu:
         algos = [gd, momentum, momentum]
@@ -362,6 +382,43 @@ if args.part1:
         # plot runtime for training as a bar graph
         plot_runtimes(x_positions, times, names, filename='train_time_part1.png')
 
+    if args.explore:
+        alpha1, alpha2 = 0.5, 0.1
+        beta1, beta2 = .85, .95
+
+        algos = [lambda : gd_alpha(alpha1),
+                 lambda : gd_alpha(alpha2),
+                 lambda : momentum_alpha(alpha1, beta1),
+                 lambda : momentum_alpha(alpha2, beta2)
+                 ]
+
+        names = [
+            "GD alpha=" + str(round(alpha1,3)),
+            "GD alpha=" + str(round(alpha2, 3)),
+            "Nesterov's alpha="+str(round(alpha1,3))+" beta="+str(round(beta1,3)),
+            "Nesterov's alpha="+str(round(alpha2,3))+" beta="+str(round(beta2,3)),
+            ]
+        models = []
+
+        for algo, name in zip(algos, names):
+            models.append(algo())
+            print(name, "done")
+
+        # Get model errors
+        metrics = get_model_errors(models, loss=True)
+        measures = ["Error", "Error", "Loss"]
+        titles = [
+            "GD and Nesterov's Momentum Training Exploration",
+            "GD and Nesterov's Momentum Test Exploration ",
+            "GD and Nesterov's Momentum Training Exploration"
+        ]
+
+        # Get the range of times
+        t = np.arange(1, num_epochs + 1)
+        # Plot metrics
+        plot_metrics(t, metrics, names, titles, measures)
+
+
 
 
 if args.part2:
@@ -371,6 +428,8 @@ if args.part2:
 
     sgd_mini = lambda _ : sgd_minibatch_sequential_scan(Xs_tr, Ys_tr, gamma, W0, alpha, B, num_epochs, monitor_period)
     sgd_momentum = lambda beta : sgd_mss_with_momentum(Xs_tr, Ys_tr, gamma, W0, alpha, beta, B, num_epochs, monitor_period)
+    sgd_mini_alpha = lambda alpha : sgd_minibatch_sequential_scan(Xs_tr, Ys_tr, gamma, W0, alpha, B, num_epochs, monitor_period)
+    sgd_momentum_alpha = lambda alpha, beta : sgd_mss_with_momentum(Xs_tr, Ys_tr, gamma, W0, alpha, beta, B, num_epochs, monitor_period)
 
     if args.accu:
         algos = [sgd_mini, sgd_momentum, sgd_momentum]
@@ -394,7 +453,7 @@ if args.part2:
         print("Loss for training set done")
 
         # Get the range of times
-        t = np.arange(1, num_epochs + 1, .1)
+        t = np.arange(.1, num_epochs + .1, .1)
         # plot training error as a function of epochs
         plot_error(t, model_error_tr, names, "SGD and Momentum Training")
         # plot test error as a function of epochs
@@ -413,6 +472,45 @@ if args.part2:
         # plot runtime for training as a bar graph
         plot_runtimes(x_positions, times, names, filename='train_time_part2.png')
 
+    if args.explore:
+        alpha1, alpha2, B = 0.25, 0.3, 600
+        beta1, beta2 = 0.85, 0.95
+        num_epochs, monitor_period = 10, 10
+
+
+        algos = [lambda : sgd_mini_alpha(alpha1),
+                 lambda : sgd_mini_alpha(alpha2),
+                 lambda : sgd_momentum_alpha(alpha1, beta1),
+                 lambda : sgd_momentum_alpha(alpha2, beta2)
+                 ]
+        names = ["Sequential Minibatch SGD alpha=" + str(round(alpha1, 3)),
+                 "Sequential Minibatch SGD alpha=" + str(round(alpha2, 3)),
+                 "Minibatch SGD + Momentum alpha=" + str(round(alpha1, 3)) + " beta=" + str(round(beta1, 3)),
+                 "Minibatch SGD + Momentum alpha=" + str(round(alpha2, 3)) + " beta=" + str(round(beta2, 3)),
+                 ]
+        models = []
+
+        for algo, name in zip(algos, names):
+            models.append(algo())
+            print(name, "done")
+
+        # Get model errors
+        model_error_tr = [get_error(Xs_tr, Ys_tr, model) for model in models]
+        print("Errors for training set done")
+        model_error_te = [get_error(Xs_te, Ys_te, model) for model in models]
+        print("Errors for test set done")
+        model_training_loss = [get_loss(Xs_te, Ys_te, model) for model in models]
+        print("Loss for training set done")
+
+        # Get the range of times
+        t = np.arange(.1, num_epochs + .1, .1)
+        # plot training error as a function of epochs
+        plot_error(t, model_error_tr, names, "SGD and Momentum Training Exploration")
+        # plot test error as a function of epochs
+        plot_error(t, model_error_te, names, "SGD and Momentum Test Exploration")
+        # plot training loss as a function of epochs
+        plot_error(t, model_training_loss, names, "SGD and Momentum Training Exploration", measure='Loss')
+
 
 
 if args.part3:
@@ -420,11 +518,12 @@ if args.part3:
     alpha1, alpha2 = 0.2, 0.01
     B, monitor_period = 600, 10
     rho1, rho2 = 0.9, 0.999
-    eps, num_epochs = 1e-5, 10
+    eps, num_epochs = 0.00001, 10
 
     sgd_mini = lambda : sgd_minibatch_sequential_scan(Xs_tr, Ys_tr, gamma, W0, alpha1, B, num_epochs, monitor_period)
-
+    sgd_mini_alpha = lambda alpha : sgd_minibatch_sequential_scan(Xs_tr, Ys_tr, gamma, W0, alpha, B, num_epochs, monitor_period)
     adam_l = lambda : adam(Xs_tr, Ys_tr, gamma, W0, alpha2, rho1, rho2, B, eps, num_epochs, monitor_period)
+    adam_l_alpha = lambda alpha, rho1, rho2 : adam(Xs_tr, Ys_tr, gamma, W0, alpha, rho1, rho2, B, eps, num_epochs, monitor_period)
 
     if args.accu:
         algos = [sgd_mini, adam_l]
@@ -445,7 +544,7 @@ if args.part3:
         print("Loss for training set done")
 
         # Get the range of times
-        t = np.arange(1, num_epochs + 1, .1)
+        t = np.arange(.1, num_epochs+.1, .1)
         # plot training error as a function of epochs
         plot_error(t, model_error_tr, names, "SGD and ADAM Training")
         # plot test error as a function of epochs
@@ -464,6 +563,46 @@ if args.part3:
         # plot runtime for training as a bar graph
         plot_runtimes(x_positions, times, names, filename='train_time_part3.png')
 
+    if args.explore:
+        num_epochs = 10
+        alpha1, alpha2 = 0.01, 0.02
+        rho1, rho2 = 0.8, 0.88
+        rho1p, rho2p = 0.85, 0.93
+        alpha_sgd1, alpha_sgd2 = 0.25, 0.3
 
-if args.expl:
-    pass
+        algos = [lambda : sgd_mini_alpha(alpha_sgd1),
+                 lambda : sgd_mini_alpha(alpha_sgd2),
+                 lambda : adam_l_alpha(alpha1, rho1, rho2),
+                 lambda: adam_l_alpha(alpha1, rho1p, rho2p),
+                 lambda: adam_l_alpha(alpha2, rho1, rho2),
+                 lambda: adam_l_alpha(alpha2, rho1p, rho2p)
+                 ]
+        names = ["Sequential Minibatch SGD alpha=" + str(round(alpha_sgd1,3)),
+                 "Sequential Minibatch SGD alpha=" + str(round(alpha_sgd2, 3)),
+                 "Adam alpha=" +str(round(alpha1, 3)) + " rho1=" + str(round(rho1, 3)) + ' rho2=' + str(round(rho2, 3)),
+                 "Adam alpha=" + str(round(alpha1, 3)) + " rho1=" + str(round(rho1p, 3)) + ' rho2=' + str(round(rho2p, 3)),
+                 "Adam alpha=" + str(round(alpha2, 3)) + " rho1=" + str(round(rho1, 3)) + ' rho2=' + str(round(rho2, 3)),
+                 "Adam alpha=" + str(round(alpha2, 3)) + " rho1=" + str(round(rho1p, 3)) + ' rho2=' + str(round(rho2p, 3))
+                 ]
+        models = []
+
+        for algo, name in zip(algos, names):
+            models.append(algo())
+            print(name, "done")
+
+        # Get model errors
+        model_error_tr = [get_error(Xs_tr, Ys_tr, model) for model in models]
+        print("Errors for training set done")
+        model_error_te = [get_error(Xs_te, Ys_te, model) for model in models]
+        print("Errors for test set done")
+        model_training_loss = [get_loss(Xs_te, Ys_te, model) for model in models]
+        print("Loss for training set done")
+
+        # Get the range of times
+        t = np.arange(.1, num_epochs + .1, .1)
+        # plot training error as a function of epochs
+        plot_error(t, model_error_tr, names, "SGD and ADAM Training Exploration")
+        # plot test error as a function of epochs
+        plot_error(t, model_error_te, names, "SGD and ADAM Test Exploration")
+        # plot training loss as a function of epochs
+        plot_error(t, model_training_loss, names, "SGD and ADAM Training Exploration", measure='Loss')
