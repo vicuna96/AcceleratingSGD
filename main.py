@@ -292,7 +292,7 @@ if __name__ == "__main__":
         for name, error in zip(names, model_error):
             pyplot.plot(t, error, label=name)
         pyplot.gca().legend()
-        pyplot.savefig((title + measure + '.png').replace(" ",""), bbox_inches='tight')
+        pyplot.savefig(("plots/" + title + measure + '.png').replace(" ",""), bbox_inches='tight')
 
 
     ''' Plot the model runtimes [times] of the models whose respective names are given by [names].
@@ -307,7 +307,7 @@ if __name__ == "__main__":
         pyplot.title('Runtime of Model Training ')
         for i, v in enumerate(times):
             pyplot.text(i-.25, v * (1.015), " " + str(round(v,2)) +' s', color='black', va='center', fontweight='bold')
-        pyplot.savefig(filename, bbox_inches='tight')
+        pyplot.savefig("plots/" + filename, bbox_inches='tight')
 
     def plot_metrics(t, metrics, names, titles, measures):
         for metric, name, title, measure in zip(metrics, names, titles, measures):
