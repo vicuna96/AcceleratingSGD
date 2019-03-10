@@ -316,16 +316,16 @@ if __name__ == "__main__":
     ''' Time the algorightms in [algos], whose respective names are given by [names],
         by averaging the runtime of the algorithm over 5 runs.
         PreC :The algorithms must be lambdas that take no inputs '''
-    def time_algos(names, algos):
+    def time_algos(names, algos, runs=5):
         times = []
         for name, algo in zip(names,algos):
             time = 0
-            for _ in range(5):
+            for _ in range(runs):
                 time -= timeit.default_timer()
                 _ = algo()
                 time += timeit.default_timer()
-            times.append(time/5)
-            print(name,time/5,"seconds")
+            times.append(time/runs)
+            print(name,time/runs,"seconds")
         return times
 
 
@@ -383,7 +383,7 @@ if args.part1:
         plot_runtimes(x_positions, times, names, filename='train_time_part1.png')
 
     if args.explore:
-        alpha1, alpha2 = 0.5, 0.1
+        alpha1, alpha2 = 0.8, 0.7
         beta1, beta2 = .85, .95
 
         algos = [lambda : gd_alpha(alpha1),
